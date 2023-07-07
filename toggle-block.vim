@@ -1,12 +1,10 @@
-" Blocker is used to toggle blocks between multiline and single line mode.
+" Toggle Block is used to toggle blocks between multiline and single line mode.
 " Outstanding issues
-"   * Unable to handle edge case where block is followed by a single character
-"   on the same line as the close parenthesis
 "   * Replaces the x register
-if exists('g:loaded_blocker')
+if exists('g:loaded_toggle_block')
     finish
 endif
-let g:loaded_blocker = 1
+let g:loaded_toggle_block = 1
 
 " Parens
 let s:parens = {
@@ -297,9 +295,9 @@ function! s:blockerExpand(start)
     call cursor(a:start[0], a:start[1])
 endfunction
 
-" Main blocker function. Will identify the block we are in, determine the type
+" Main toggle function. Will identify the block we are in, determine the type
 " and then either contract or expand the block.
-function! s:blocker() abort
+function! s:ToggleBlock() abort
     let l:curpos = [line("."), col(".")]
     let l:start = s:blockerSearchBackwards(l:curpos)
     if l:start[1] == -1
@@ -315,5 +313,5 @@ function! s:blocker() abort
     endif
 endfunction
 
-command! Blocker call <SID>blocker()
-nnoremap tb :Blocker<CR>
+command! ToggleBlock call <SID>ToggleBlock()
+nnoremap tb :ToggleBlock<CR>
