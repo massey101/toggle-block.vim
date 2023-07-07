@@ -102,23 +102,13 @@ function! s:get_visual_selection()
 endfunction
 
 " Blocker
+" Get the current block type. 0 for a single line and 1 for a split block.
+" Assumes that the multi block doesn't have erroneous whitespace after its
+" start.
 function! s:blockerGetBlockType(start)
     if a:start[1] == col("$") - 1
         return 0
     endif
-    return 1
-endfunction
-
-function! s:blockerGetBlockTypeOld(start)
-    normal %
-    if line(".") == a:start[0]
-        if col(".") == a:start[1]
-            return -1
-        endif
-        normal %
-        return 0
-    endif
-    normal %
     return 1
 endfunction
 
@@ -161,10 +151,45 @@ let s:whitespace = {
             \ "\n": 1
             \}
 
+" Removes a character at an index from a string
 function! s:removeChar(string, index)
     return a:string[:a:index-1] .. a:string[a:index+1:]
 endfunction
 
+" Trims whitespace starting at an index
+function! s:trimWhitespace(string, index)
+    let l:cursor = a:index
+    let l:new_string = a:string
+
+    while l:cursor < strlen(a:string)
+        let l:character = l:new_string[l:cursor]
+        if ! has_key(s:whitespace, l:character)
+            break
+        endif
+        let l:new_string = s:removeChar(l:new_string, l:cursor)
+    endwhile
+
+    return l:new_string
+endfunction
+
+" no_trailing_comma_filetypes is a list of filetypes that will not allow a
+" trailing comma in a list.
+let g:no_trailing_comma_filetypes = ["json"]
+function! s:trailing_comma()
+    let l:filetype = &filetype
+
+    for l:trailing_comma_filetype in g:no_trailing_comma_filetypes
+        if l:filetype == l:trailing_comma_filetype
+            return 0
+        endif
+    endfor
+
+    return 1
+endfunction
+
+" Contract a block down to one line. Starts at the beginning removing newlines
+" and whitespace unless it enters within another block.
+" Will also remove the trailing comma if it exists.
 function! s:blockerContract(start)
     call cursor(a:start[0], a:start[1])
     " Probably a better way of doing this but get_visual_selection only seems
@@ -174,20 +199,11 @@ function! s:blockerContract(start)
     let l:selection = s:get_visual_selection()
     let l:cursor = 0
     call s:parensInit()
-    let l:mode = "Search"
     let l:i = 0
     while l:i < 10000
         let l:i = l:i + 1
 
         let l:character = l:selection[l:cursor]
-        if l:mode == "Remove Whitespace"
-            if has_key(s:whitespace, l:character)
-                let l:selection = s:removeChar(l:selection, l:cursor)
-                continue
-            else
-                let l:mode = "Search"
-            endif
-        endif
         if s:parensIsClose(l:character)
             if len(s:parensStack) == 1
                 break
@@ -197,16 +213,16 @@ function! s:blockerContract(start)
         elseif s:parensIsOpen(l:character)
             call s:parensAdd(l:character)
             if len(s:parensStack) == 1
-                let l:mode = "Remove Whitespace"
+                let l:selection = s:trimWhitespace(l:selection, l:cursor+1)
             endif
         endif
         if len(s:parensStack) == 1
             if l:character == ","
-                let l:mode = "Remove Whitespace"
                 " Add a whitespace and then skip it to ensure there is
                 " whitespace after a comma
                 let l:selection = l:selection[:l:cursor] .. " " .. l:selection[l:cursor+1:]
                 let l:cursor = l:cursor + 1
+                let l:selection = s:trimWhitespace(l:selection, l:cursor+1)
             endif
         endif
 
@@ -214,10 +230,7 @@ function! s:blockerContract(start)
     endwhile
     let l:cursor = l:cursor - 1
     let l:i = 0
-    while 1
-        if l:i > 10000
-            break
-        endif
+    while l:i < 10000
         let l:i = l:i + 1
 
         let l:character = l:selection[l:cursor]
@@ -234,6 +247,9 @@ function! s:blockerContract(start)
     call cursor(a:start[0], a:start[1])
 endfunction
 
+" Expand a block onto multiple lines. Will start at the beginning adding
+" newlines where necessary unless it enters within another block.
+" Will also add a trailing comma unless instructed otherwise by the filetype.
 function! s:blockerExpand(start)
     call cursor(a:start[0], a:start[1])
     normal v%
@@ -248,8 +264,13 @@ function! s:blockerExpand(start)
         let l:character = l:selection[l:cursor]
         if s:parensIsClose(l:character)
             if len(s:parensStack) == 1
-                let l:selection = l:selection[:l:cursor-1] .. ",\n" .. l:selection[l:cursor:]
-                let l:cursor = l:cursor + 2
+                if s:trailing_comma()
+                    let l:selection = l:selection[:l:cursor-1] .. ",\n" .. l:selection[l:cursor:]
+                    let l:cursor = l:cursor + 2
+                else
+                    let l:selection = l:selection[:l:cursor-1] .. "\n" .. l:selection[l:cursor:]
+                    let l:cursor = l:cursor + 1
+                endif
                 break
             else
                 call s:parensPop(l:character)
@@ -263,7 +284,6 @@ function! s:blockerExpand(start)
         endif
         if len(s:parensStack) == 1
             if l:character == ","
-                let l:mode = "Add Whitespace"
                 let l:selection = l:selection[:l:cursor] .. "\n" .. l:selection[l:cursor+1:]
                 let l:cursor = l:cursor + 1
             endif
@@ -277,6 +297,8 @@ function! s:blockerExpand(start)
     call cursor(a:start[0], a:start[1])
 endfunction
 
+" Main blocker function. Will identify the block we are in, determine the type
+" and then either contract or expand the block.
 function! s:blocker() abort
     let l:curpos = [line("."), col(".")]
     let l:start = s:blockerSearchBackwards(l:curpos)
