@@ -1,11 +1,3 @@
-" Toggle Block is used to toggle blocks between multiline and single line mode.
-" Outstanding issues
-"   * Replaces the x register
-if exists('g:loaded_toggle_block')
-    finish
-endif
-let g:loaded_toggle_block = 1
-
 " Parens
 let s:parens = {
             \ '(': ')',
@@ -73,6 +65,7 @@ function! s:replaceVisualSelection(selection)
     let l:line_length = strlen(getline(l:line_end))
 
     normal d
+    let l:tempX = @x
     let @x = a:selection
     " Put the text before the cursor by default. But if we are at the start
     " or the end of the line then we want to put the text after the cursor.
@@ -81,6 +74,7 @@ function! s:replaceVisualSelection(selection)
     else
         normal "xP
     endif
+    let @x = l:tempX
 endfunction
 
 
@@ -297,7 +291,7 @@ endfunction
 
 " Main toggle function. Will identify the block we are in, determine the type
 " and then either contract or expand the block.
-function! s:ToggleBlock() abort
+function! toggleBlock#ToggleBlock() abort
     let l:curpos = [line("."), col(".")]
     let l:start = s:blockerSearchBackwards(l:curpos)
     if l:start[1] == -1
@@ -312,6 +306,3 @@ function! s:ToggleBlock() abort
         call s:blockerContract(l:start)
     endif
 endfunction
-
-command! ToggleBlock call <SID>ToggleBlock()
-nnoremap tb :ToggleBlock<CR>
