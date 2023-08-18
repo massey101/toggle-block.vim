@@ -28,7 +28,7 @@ It's even able to handle rather complicated nested brackets.
 ![](https://github.com/massey101/toggle-block.vim/blob/master/static/complicatedToggle.gif)
 
 It's also able to adapt to json files which don't use a trailing comma.
-![](https://gitbub.com/massey101/toggle-block.vim/blob/master/static/jsonToggle.gif)
+![](https://github.com/massey101/toggle-block.vim/blob/master/static/jsonToggle.gif)
 
 Installation
 -------------------------------------------------------------------------------
